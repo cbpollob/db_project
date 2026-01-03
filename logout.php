@@ -1,6 +1,7 @@
 <?php
 session_start();
 include "db_connection.php";
+include "password_utils.php";
 
 // Log logout activity before destroying session
 if (isset($_SESSION['user_id'])) {
@@ -19,10 +20,7 @@ if (isset($_SESSION['user_id'])) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
     
     $userId = intval($_SESSION['user_id']);
-    $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $stmt = $conn->prepare("INSERT INTO user_activity_log (user_id, activity_type, description, ip_address) VALUES (?, 'logout', 'User logged out', ?)");
-    $stmt->bind_param('is', $userId, $ipAddress);
-    $stmt->execute();
+    logUserActivity($conn, $userId, 'logout', 'User logged out');
 }
 
 session_destroy();

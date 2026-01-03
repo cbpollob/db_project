@@ -1,8 +1,13 @@
 <?php
 session_start();
 include "db_connection.php";
+include "password_utils.php";
 
 $cssVersion = file_exists(__DIR__ . '/style.css') ? filemtime(__DIR__ . '/style.css') : time();
+
+// Demo mode flag - set to false in production to hide reset tokens in browser
+// In production, tokens should be sent via email instead
+define('DEMO_MODE', true);
 
 // Ensure password reset tokens table exists
 $conn->query("CREATE TABLE IF NOT EXISTS password_reset_tokens (
@@ -65,13 +70,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
             
             // Log the password reset request
-            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-            $stmt = $conn->prepare("INSERT INTO user_activity_log (user_id, activity_type, description, ip_address) VALUES (?, 'password_reset', 'Password reset requested', ?)");
-            $stmt->bind_param('is', $userId, $ipAddress);
-            $stmt->execute();
+            logUserActivity($conn, $userId, 'password_reset', 'Password reset requested');
             
             $success = true;
-            $resetToken = $token; // In production, this would be emailed
+            // DEMO_MODE: Show reset token in browser. In production, send via email
+            if (DEMO_MODE) {
+                $resetToken = $token;
+            }
         } else {
             // For security, don't reveal if email exists
             $success = true;

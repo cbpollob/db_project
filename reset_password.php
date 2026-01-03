@@ -1,6 +1,7 @@
 <?php
 session_start();
 include "db_connection.php";
+include "password_utils.php";
 
 $cssVersion = file_exists(__DIR__ . '/style.css') ? filemtime(__DIR__ . '/style.css') : time();
 
@@ -47,56 +48,6 @@ $error = null;
 $tokenValid = false;
 $userId = null;
 
-// Password strength validation function
-function validatePasswordStrength($password) {
-    $errors = [];
-    
-    if (strlen($password) < 8) {
-        $errors[] = "Password must be at least 8 characters long";
-    }
-    if (!preg_match('/[A-Z]/', $password)) {
-        $errors[] = "Password must contain at least one uppercase letter";
-    }
-    if (!preg_match('/[a-z]/', $password)) {
-        $errors[] = "Password must contain at least one lowercase letter";
-    }
-    if (!preg_match('/[0-9]/', $password)) {
-        $errors[] = "Password must contain at least one number";
-    }
-    if (!preg_match('/[^A-Za-z0-9]/', $password)) {
-        $errors[] = "Password must contain at least one special character";
-    }
-    
-    return $errors;
-}
-
-// Check if password was used before (last 5 passwords)
-function isPasswordReused($conn, $userId, $newPassword) {
-    $stmt = $conn->prepare("SELECT password_hash FROM password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
-    $stmt->bind_param('i', $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    while ($row = $result->fetch_assoc()) {
-        if (password_verify($newPassword, $row['password_hash'])) {
-            return true;
-        }
-    }
-    
-    // Also check current password
-    $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
-    $stmt->bind_param('i', $userId);
-    $stmt->execute();
-    $stmt->bind_result($currentHash);
-    $stmt->fetch();
-    $stmt->close();
-    
-    if ($currentHash && password_verify($newPassword, $currentHash)) {
-        return true;
-    }
-    
-    return false;
-}
 
 // Validate token
 if (!empty($token)) {
@@ -148,9 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
             
             // Store current password in history
             if ($currentHash) {
-                $stmt = $conn->prepare("INSERT INTO password_history (user_id, password_hash) VALUES (?, ?)");
-                $stmt->bind_param('is', $userId, $currentHash);
-                $stmt->execute();
+                storePasswordInHistory($conn, $userId, $currentHash);
             }
             
             // Update password
@@ -165,10 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $tokenValid) {
             $stmt->execute();
             
             // Log password reset activity
-            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-            $stmt = $conn->prepare("INSERT INTO user_activity_log (user_id, activity_type, description, ip_address) VALUES (?, 'password_reset', 'Password reset completed', ?)");
-            $stmt->bind_param('is', $userId, $ipAddress);
-            $stmt->execute();
+            logUserActivity($conn, $userId, 'password_reset', 'Password reset completed');
             
             $success = true;
         }

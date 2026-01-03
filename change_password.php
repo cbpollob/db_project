@@ -1,6 +1,7 @@
 <?php
 session_start();
 include "db_connection.php";
+include "password_utils.php";
 
 $cssVersion = file_exists(__DIR__ . '/style.css') ? filemtime(__DIR__ . '/style.css') : time();
 
@@ -38,57 +39,6 @@ $userId = intval($_SESSION['user_id']);
 $success = false;
 $error = null;
 
-// Password strength validation function
-function validatePasswordStrength($password) {
-    $errors = [];
-    
-    if (strlen($password) < 8) {
-        $errors[] = "Password must be at least 8 characters long";
-    }
-    if (!preg_match('/[A-Z]/', $password)) {
-        $errors[] = "Password must contain at least one uppercase letter";
-    }
-    if (!preg_match('/[a-z]/', $password)) {
-        $errors[] = "Password must contain at least one lowercase letter";
-    }
-    if (!preg_match('/[0-9]/', $password)) {
-        $errors[] = "Password must contain at least one number";
-    }
-    if (!preg_match('/[^A-Za-z0-9]/', $password)) {
-        $errors[] = "Password must contain at least one special character";
-    }
-    
-    return $errors;
-}
-
-// Check if password was used before (last 5 passwords)
-function isPasswordReused($conn, $userId, $newPassword) {
-    $stmt = $conn->prepare("SELECT password_hash FROM password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
-    $stmt->bind_param('i', $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    while ($row = $result->fetch_assoc()) {
-        if (password_verify($newPassword, $row['password_hash'])) {
-            return true;
-        }
-    }
-    
-    // Also check current password
-    $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
-    $stmt->bind_param('i', $userId);
-    $stmt->execute();
-    $stmt->bind_result($currentHash);
-    $stmt->fetch();
-    $stmt->close();
-    
-    if ($currentHash && password_verify($newPassword, $currentHash)) {
-        return true;
-    }
-    
-    return false;
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $currentPassword = $_POST['current_password'] ?? '';
     $newPassword = $_POST['new_password'] ?? '';
@@ -117,9 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "This password was used recently. Please choose a different password";
         } else {
             // Store current password in history before changing
-            $stmt = $conn->prepare("INSERT INTO password_history (user_id, password_hash) VALUES (?, ?)");
-            $stmt->bind_param('is', $userId, $currentHash);
-            $stmt->execute();
+            storePasswordInHistory($conn, $userId, $currentHash);
             
             // Update password
             $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -128,10 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
             
             // Log password change activity
-            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-            $stmt = $conn->prepare("INSERT INTO user_activity_log (user_id, activity_type, description, ip_address) VALUES (?, 'password_change', 'Password changed successfully', ?)");
-            $stmt->bind_param('is', $userId, $ipAddress);
-            $stmt->execute();
+            logUserActivity($conn, $userId, 'password_change', 'Password changed successfully');
             
             $success = true;
         }

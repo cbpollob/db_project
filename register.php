@@ -1,5 +1,6 @@
 <?php
 include "db_connection.php";
+include "password_utils.php";
 
 // Ensure user activity log table exists for registration tracking
 $conn->query("CREATE TABLE IF NOT EXISTS user_activity_log (
@@ -40,10 +41,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         // Get the newly inserted user ID and log registration activity
         $newUserId = $conn->insert_id;
-        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $logStmt = $conn->prepare("INSERT INTO user_activity_log (user_id, activity_type, description, ip_address) VALUES (?, 'registration', 'New user registered', ?)");
-        $logStmt->bind_param('is', $newUserId, $ipAddress);
-        $logStmt->execute();
+        logUserActivity($conn, $newUserId, 'registration', 'New user registered');
 
         header("Location: login.php");
         exit;

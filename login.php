@@ -1,6 +1,7 @@
 <?php
 session_start();
 include "db_connection.php";
+include "password_utils.php";
 
 $cssVersion = file_exists(__DIR__ . '/style.css') ? filemtime(__DIR__ . '/style.css') : time();
 
@@ -67,10 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $_SESSION["role"]    = $role;
         
         // Log successful login activity
-        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $logStmt = $conn->prepare("INSERT INTO user_activity_log (user_id, activity_type, description, ip_address) VALUES (?, 'login', 'User logged in successfully', ?)");
-        $logStmt->bind_param('is', $id, $ipAddress);
-        $logStmt->execute();
+        logUserActivity($conn, $id, 'login', 'User logged in successfully');
         
         // Redirect admin to admin panel, users to their destination
         if ($role === 'admin' && $loginType === 'admin') {
