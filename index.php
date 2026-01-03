@@ -51,6 +51,7 @@ $genres = $genresRes ? $genresRes->fetch_all(MYSQLI_ASSOC) : [];
         <?php if($_SESSION['role'] === 'admin'): ?>
           <a href="admin_users.php">Manage Users</a>
         <?php endif; ?>
+        <a href="change_password.php">Change Password</a>
         <a href="logout.php">Logout</a>
       <?php else: ?>
         <a href="login.php">Login</a>
