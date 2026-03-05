@@ -1,6 +1,7 @@
 <?php
 session_start();
 include "db_connection.php";
+include "password_utils.php";
 
 $cssVersion = file_exists(__DIR__ . '/style.css') ? filemtime(__DIR__ . '/style.css') : time();
 
@@ -16,6 +17,20 @@ $seed->bind_param('sss', $adminUser, $adminEmail, $adminPassHash);
 $seed->execute();
 
 $loginType = isset($_POST['login_type']) ? $_POST['login_type'] : (isset($_GET['type']) ? $_GET['type'] : 'user');
+
+// Ensure user activity log table exists for login tracking
+$conn->query("CREATE TABLE IF NOT EXISTS user_activity_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    activity_type ENUM('login','logout','password_change','password_reset','registration','role_change') NOT NULL,
+    description TEXT DEFAULT NULL,
+    ip_address VARCHAR(45) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX (user_id),
+    INDEX idx_activity_type (activity_type),
+    INDEX idx_created_at (created_at),
+    CONSTRAINT fk_ual_user_login FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Optional redirect target (only allow local paths)
@@ -51,6 +66,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $_SESSION["user_id"] = $id;
         $_SESSION["name"]    = $username;
         $_SESSION["role"]    = $role;
+        
+        // Log successful login activity
+        logUserActivity($conn, $id, 'login', 'User logged in successfully');
         
         // Redirect admin to admin panel, users to their destination
         if ($role === 'admin' && $loginType === 'admin') {
@@ -103,6 +121,7 @@ if (preg_match('/^https?:\/\//i', $redirect) || strpos($redirect, '//') === 0) {
         
         <?php if($loginType !== 'admin'): ?>
         <p class="help" style="margin:14px 0 0;text-align:center">New to CineClick? <a href="register.php">Create Account</a></p>
+        <p class="help" style="margin:8px 0 0;text-align:center"><a href="forgot_password.php">Forgot Password?</a></p>
         <?php else: ?>
         <p class="help" style="margin:14px 0 0;text-align:center;font-size:12px">🔒 Authorized personnel only</p>
         <?php endif; ?>

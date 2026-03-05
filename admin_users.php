@@ -385,6 +385,7 @@ body.admin-page {
     </div>
     <nav class="admin-nav">
       <a class="btn btn-sm" href="upload_movie.php">📤 Upload Movie</a>
+      <a class="btn btn-outline btn-sm" href="change_password.php">🔐 Change Password</a>
       <a class="btn btn-outline btn-sm" href="index.php">🏠 View Site</a>
       <a class="btn btn-outline btn-sm" href="logout.php">🚪 Logout</a>
     </nav>
